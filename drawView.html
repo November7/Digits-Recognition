@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.7.0"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.5.1/dist/tfjs-vis.umd.min.js"></script>
+    <style>
+        #camView {
+            border: 1px solid black;
+            margin: auto;
+        }
+        #controls {
+            margin: auto;
+            margin-top: 20px;            
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">      
+        <h1>Narysuj cyfrę</h1>
+        <p>[Esc] czyści obszar rysowania</p>        
+        <canvas id="canvas" width="400px" height="400px" class="canvas" style="border:1px solid #b9bfc9;margin-top:25px;"></canvas>
+        <div class="predictions" id="predictions"></div>
+    </div>
+           
+    <script>
+
+        let canvas = document.getElementById("canvas");
+        let ctx = canvas.getContext('2d');
+        let drag = false;
+        let pos = { x: 0, y: 0 };
+        let model = null;
+        let predDiv = document.getElementById("predictions");
+
+        async function loadModel() {             
+            model = await tf.loadLayersModel('./Models/model1/model.json');
+            model.predict(tf.zeros([1, 28, 28, 1]))           
+        }
+
+        function setPos(e) {
+            pos.x = e.clientX - ctx.canvas.offsetLeft;
+            pos.y = e.clientY - ctx.canvas.offsetTop;
+        }
+
+        canvas.addEventListener('contextmenu',function(e) {
+            e.preventDefault();            
+        })
+        
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            predDiv.innerHTML = "Oczekuję na rysunek...";
+        }
+
+        document.addEventListener('keydown', function(event){
+            if(event.key === "Escape"){
+                clearCanvas();        
+            }
+        });
+
+
+        canvas.addEventListener('mousedown',  function (e) {  
+            drag = true; 
+            setPos(e);
+        });
+
+        canvas.addEventListener('mouseup', function () { 
+            drag = false; 
+            predictModel();
+        });
+
+
+        canvas.addEventListener('mousemove',  function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (drag) {
+                ctx.beginPath();
+                ctx.lineWidth = 15;               
+                ctx.strokeStyle = 'white';
+                ctx.lineCap = 'round';
+                ctx.moveTo(pos.x, pos.y);
+                setPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();                
+            }
+        });
+        
+
+        async function predictModel() {
+             imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+             image = tf.browser.fromPixels(imageData);
+            image = tf.image.resizeBilinear(image, [28,28]).sum(2).expandDims(0).expandDims(-1)
+
+             prediction = model.predict(image);
+                    
+            
+
+            predDiv.innerHTML = "Rozpoznane jako:" + prediction.argMax(1).dataSync();
+        }
+
+        loadModel();
+        clearCanvas();
+    </script>
+
+</body>
+</html>
